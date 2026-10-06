@@ -6,6 +6,8 @@ data/
 
 # Airflow
 logs/
+plugins/
+config/
 
 # Python
 __pycache__/
