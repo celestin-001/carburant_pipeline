@@ -3,6 +3,7 @@
 
 # Données locales
 data/
+sql/
 
 # Airflow
 logs/
