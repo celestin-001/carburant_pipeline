@@ -15,6 +15,7 @@ __pycache__/
 *.pyc
 .venv/
 .ipynb_checkpoints/
+.virtual_documents/
 
 # IDE / OS
 .vscode/
