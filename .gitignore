@@ -3,6 +3,7 @@
 
 # Données locales
 data/
+sql/
 
 # Airflow
 logs/
@@ -14,6 +15,7 @@ __pycache__/
 *.pyc
 .venv/
 .ipynb_checkpoints/
+.virtual_documents/
 
 # IDE / OS
 .vscode/
