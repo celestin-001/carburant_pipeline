@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS rupture (
     carburant_id  SMALLINT REFERENCES carburant(id),
     debut         TIMESTAMPTZ,
     fin           TIMESTAMPTZ,                                     -- NULL = rupture en cours
-    type_rup      VARCHAR(12) CHECK (type_rup IN ('temporaire', 'definitive')),
     PRIMARY KEY (station_id, carburant_id, debut),
     CHECK (fin IS NULL OR fin >= debut)
 );
