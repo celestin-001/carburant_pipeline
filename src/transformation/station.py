@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Set, Optional, Literal
-import pandas as pd
-from decimal import Decimal
 from enum import StrEnum
+from typing import List, Set, Optional, Literal
+from decimal import Decimal
+
 
 CARBURANTS = {
     1: {"id": 1,"nom": "Gazole","prix": "Prix Gazole","date": "Prix Gazole mis à jour le",},
@@ -14,6 +14,9 @@ CARBURANTS = {
     6: {"id": 6, "nom": "SP98", "prix": "Prix SP98", "date": "Prix SP98 mis à jour le"},
 }
 
+COLONNES_OBLIGATOIRES = frozenset(
+    {"id", "latitude", "longitude", "Code postal", "Ville", "code_departement", "pop"}
+)
 
 class Motifs(StrEnum):
     IDENTIFIANT_INVALIDE = "IDENTIFIANT INVALIDE"
@@ -24,12 +27,10 @@ class Motifs(StrEnum):
     VILLE_MANQUANTE = "VILLE MANQUANTE"
     DEPARTEMENT_MANQUANT = "DEPARTEMENT MANQUANT"
     POP_INVALIDE = "POP INVALIDE"
+    LIGNE_INVALIDE = "LIGNE INVALIDE"
 
 
-COORDONNEES_ECHELLE = 100000
 BORNE_PRIX = (Decimal("0.3"), Decimal("5.0"))
-BORNE_LATITUDE = (41.0, 52.0)
-BORNE_LONGITUDE = (-5.5, 10.0)
 POP_VALIDES = {"R", "A"}
 
 
@@ -71,7 +72,7 @@ class Rupture:
 @dataclass(frozen=True)
 class Rejet:
     station_id: Optional[int]
-    motif: Motifs
+    motif: str
 
 
 @dataclass
@@ -87,7 +88,3 @@ class LigneInvalide(Exception):
     def __init__(self, motif: Motifs):
         super().__init__(motif)
         self.motif = motif
-
-
-def transformer(df: pd.DataFrame) -> ResultTransformation:
-    return ResultTransformation()

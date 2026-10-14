@@ -1,14 +1,19 @@
-
 import pandas as pd
-from joblib.testing import raises, fixture
+import pytest
+import glob
 
-from src.ingestion.transform import transformer, Station
-from src.ingestion.transform import ResultTransformation
-from dataclasses import FrozenInstanceError
+from src.transformation.station import Station
+from src.transformation.station_transform  import transformer
+from pathlib import Path
 
-@fixture
+DIR = Path.cwd().parent
+
+chemin = str(DIR/ "carburant-pipeline" / "data" / "raw" / "prix-carburants_*.csv")
+files = sorted(glob.glob(chemin))
+dernier_fichier = files[-1]
+print(dernier_fichier)
+@pytest.fixture
 def station_valide():
-    """Fixture qui fournit une station de test de base."""
     return Station(
         id=1,
         code_postal="62100",
@@ -26,12 +31,13 @@ def test_creation_station_avec_valeurs_par_defaut(station_valide):
     assert station_valide.code_region is None
 
 def test_immutabilite_station(station_valide):
-
-
-    with raises(FrozenInstanceError):
+    """
+       :type station_valide: object
+    """
+    with pytest.raises(AttributeError):
         station_valide.ville = "Dunkerque"
-def test_creation_station_avec_valeurs_optionnelles():
 
+def test_creation_station_avec_valeurs_optionnelles():
     station_complete = Station(
         id=2,
         code_postal="75001",
@@ -45,8 +51,8 @@ def test_creation_station_avec_valeurs_optionnelles():
     )
     assert station_complete.adresse == "1 Rue de Rivoli"
     assert station_complete.code_region == "11"
-def test_egalite_stations(station_valide):
 
+def test_egalite_stations(station_valide):
     station_identique = Station(
         id=1,
         code_postal="62100",
@@ -59,9 +65,13 @@ def test_egalite_stations(station_valide):
     assert station_valide == station_identique
 
 def test_transform():
-    df = pd.DataFrame()
-    stations = ResultTransformation().stations
-    assert transformer(df) == ResultTransformation()
-    assert len(stations) == 0
 
+    df = pd.DataFrame()
+    result = transformer(df)
+    assert len(result.stations) == 0
+
+def test_transformer_valid():
+    df = pd.read_csv(dernier_fichier,dtype="str")
+    result = transformer(df)
+    assert len(result.stations) + len(result.rejets) == len(df)
 
