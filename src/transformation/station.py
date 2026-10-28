@@ -6,16 +6,23 @@ from decimal import Decimal
 
 
 CARBURANTS = {
-    1: {"id": 1,"nom": "Gazole","prix": "Prix Gazole","date": "Prix Gazole mis à jour le",},
-    2: {"id": 2, "nom": "SP95", "prix": "Prix SP95", "date": "Prix SP95 mis à jour le"},
-    3: {"id": 3, "nom": "E85", "prix": "Prix E85", "date": "Prix E85 mis à jour le"},
-    4: {"id": 4, "nom": "GPLc", "prix": "Prix GPLc", "date": "Prix GPLc mis à jour le"},
-    5: {"id": 5, "nom": "E10", "prix": "Prix E10", "date": "Prix E10 mis à jour le"},
-    6: {"id": 6, "nom": "SP98", "prix": "Prix SP98", "date": "Prix SP98 mis à jour le"},
+    1: {"nom": "Gazole","prix": "Prix Gazole","date": "Prix Gazole mis à jour le",},
+    2: {"nom": "SP95", "prix": "Prix SP95", "date": "Prix SP95 mis à jour le"},
+    3: {"nom": "E85", "prix": "Prix E85", "date": "Prix E85 mis à jour le"},
+    4: {"nom": "GPLc", "prix": "Prix GPLc", "date": "Prix GPLc mis à jour le"},
+    5: {"nom": "E10", "prix": "Prix E10", "date": "Prix E10 mis à jour le"},
+    6: {"nom": "SP98", "prix": "Prix SP98", "date": "Prix SP98 mis à jour le"},
 }
+ORIGINE_TEMPS_REEL = "temps_reel"
+ORIGINE_BACKFILL = "backfill"
 
 COLONNES_OBLIGATOIRES = frozenset(
-    {"id", "latitude", "longitude", "Code postal", "Ville", "code_departement", "pop"}
+    {"id", "latitude", "longitude", "Code postal", "Ville", "code_departement", "pop",
+    "Prix Gazole mis à jour le", 'Prix Gazole', "Prix SP95 mis à jour le",
+    "Prix SP95", "Prix E85 mis à jour le", "Prix E85",
+    "Prix GPLc mis à jour le", "Prix GPLc", "Prix E10 mis à jour le",
+    "Prix E10", "Prix SP98 mis à jour le", "Prix SP98",
+     }
 )
 
 class Motifs(StrEnum):
@@ -28,6 +35,12 @@ class Motifs(StrEnum):
     DEPARTEMENT_MANQUANT = "DEPARTEMENT MANQUANT"
     POP_INVALIDE = "POP INVALIDE"
     LIGNE_INVALIDE = "LIGNE INVALIDE"
+    PRIX_SANS_DATE = "PRIX SANS DATE"
+    PRIX_ILLISIBLE = "PRIX ILLISIBLE"
+    PRIX_HORS_PLAGE = "PRIX HORS PLAGE"
+    DATE_SANS_PRIX = "DATE SANS PRIX"
+    DATE_ILLISIBLE = "DATE ILLISIBLE"
+
 
 
 BORNE_PRIX = (Decimal("0.3"), Decimal("5.0"))
@@ -73,6 +86,7 @@ class Rupture:
 class Rejet:
     station_id: Optional[int]
     motif: str
+    carburant_id: Optional[int]=None
 
 
 @dataclass

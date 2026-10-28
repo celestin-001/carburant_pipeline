@@ -1,5 +1,10 @@
-from src.transformation.station import Station, LigneInvalide, Motifs, POP_VALIDES, ResultTransformation, Rejet,COLONNES_OBLIGATOIRES
+import pandas
+
+from src.transformation.station import (Station, LigneInvalide, Motifs,
+                                        POP_VALIDES, ResultTransformation,
+                                        Rejet,COLONNES_OBLIGATOIRES,Service)
 from utils.transform_utils import *
+from utils.transform_utils import _construire_prix, _construire_ruptures
 
 
 def _verifier_colonnes(df: pd.DataFrame) -> None:
@@ -64,8 +69,17 @@ def transformer(df: pd.DataFrame) -> ResultTransformation:
             station = _construire_station(ligne)
             if station.id in identifiants_vus:
                 raise LigneInvalide(Motifs.IDENTIFIANT_DUPLIQUE)
+
             identifiants_vus.add(station.id)
             resultat.stations.append(station)
+            noms = lire_noms_services(ligne.get("services"))
+            prix,rejets = _construire_prix(ligne,station.id)
+            ruptures = _construire_ruptures(ligne,station.id)
+            resultat.services.extend(Service(station.id, nom) for nom in noms)
+            resultat.prix.extend(prix)
+            resultat.rejets.extend(rejets)
+            resultat.ruptures.extend(ruptures)
+
         except LigneInvalide as exc:
             resultat.rejets.append(Rejet(lire_entier(ligne["id"]), exc.motif))
 
