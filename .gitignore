@@ -9,6 +9,9 @@ logs/
 plugins/
 config/
 
+#notebooks
+notebooks/
+
 # Python
 __pycache__/
 *.pyc
