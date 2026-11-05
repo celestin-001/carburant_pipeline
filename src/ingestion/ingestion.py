@@ -10,7 +10,6 @@ from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
 
-# À vérifier avec `curl -I <url>` avant de s'y fier (domaine, identifiant, fraîcheur).
 DEFAULT_CSV_URL = (
     "https://tabular-api.data.gouv.fr"
     "/api/resources/edd67f5b-46d0-4663-9de9-e5db1c880160/data/csv/"
