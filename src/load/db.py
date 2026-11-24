@@ -9,14 +9,11 @@ from datetime import timezone
 from src.transformation.station import Station, Service, Prix, Rupture
 
 
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
 def get_connection():
-    return psycopg2.connect(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=os.getenv("POSTGRES_PORT_HOST", "5433"),
-        dbname=os.getenv("POSTGRES_DB", "carburants"),
-        user=os.getenv("POSTGRES_USER", "user"),
-        password=os.getenv("POSTGRES_PASSWORD","user"),
-    )
+    hook = PostgresHook(postgres_conn_id='bdd_metiers')
+    return hook.get_conn()
 
 
 def load_stations(conn, stations: list[Station]):
