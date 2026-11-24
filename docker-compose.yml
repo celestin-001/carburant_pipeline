@@ -5,6 +5,7 @@
 #   AIRFLOW_IMAGE_NAME           - image Docker (défaut : apache/airflow:2.10.3-python3.11)
 #   AIRFLOW_UID                  - UID utilisateur dans les conteneurs (défaut : 50000)
 #   AIRFLOW_PROJ_DIR             - dossier de base des volumes (défaut : .)
+#   DOCKER_DNS_SERVER            - résolveur DNS accessible depuis Docker (défaut : 172.20.10.1)
 #   FERNET_KEY                   - clé de chiffrement des connexions/variables (obligatoire)
 #   _AIRFLOW_WWW_USER_USERNAME   - login admin (défaut : airflow)
 #   _AIRFLOW_WWW_USER_PASSWORD   - mot de passe admin (défaut : airflow)
@@ -14,6 +15,8 @@ x-airflow-common:
   image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.10.3-python3.11}
   env_file:
     - ${ENV_FILE_PATH:-.env}
+  dns:
+    - ${DOCKER_DNS_SERVER:-172.20.10.1}
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
