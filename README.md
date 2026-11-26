@@ -106,9 +106,3 @@ Il n'existe pas de commande autonome `python -m src.db` : le chargement s'exécu
 
 - **En place :** ingestion, transformation, chargement PostGIS et orchestration Airflow.
 - **À faire :** vues/requêtes analytiques (par exemple moyennes mobiles sur 7/30 jours) et tableau de bord cartographique/évolutif. Aucun fichier SQL de vues analytiques ni application dans `app/` n'est présent actuellement.
-
-### Validation locale du 24 novembre 2026
-
-- `python -m pytest -q tests/` : **67 tests réussis**.
-- Le run manuel Airflow `collect_carburant_dag` de **21:04 UTC** a terminé en `success` : téléchargement de 18,7 Mo, 9 825 lignes lues, 9 821 stations valides, 32 986 prix et 2 944 ruptures transformés; le journal confirme la fin du chargement PostgreSQL.
-- Lors du contrôle en lecture seule de la base, elle contenait 9 848 stations, 87 678 prix, 27 services et 6 405 ruptures, dont 2 943 ouvertes. Ces nombres décrivent l'état observé à cette date et évolueront avec les collectes.
