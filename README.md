@@ -1,109 +1,114 @@
-# Pipeline Data: Prix des carburants en temps réel (France)
+# Pipeline des prix des carburants (France)
 
-Ce projet est un pipeline de données automatisé développé en Python, SQL et Docker. Il permet de collecter, nettoyer, transformer et historiser les données des prix des carburants et des ruptures de stock en France métropolitaine (~9 800 stations) depuis les flux officiels de `data.gouv.fr`.
+Ce projet collecte le flux public des prix des carburants, le transforme et l'historise dans PostgreSQL/PostGIS. Airflow orchestre le pipeline toutes les 30 minutes.
 
-##  Objectif du projet
+## Objectif
 
-Les API officielles ne fournissent qu'un instantané des prix à un instant T. L'objectif de ce pipeline est de constituer un **historique spatio-temporel complet** en ne conservant que les **changements réels** de prix et en détectant la durée des ruptures temporaires de stock.
+Le flux source est un instantané. Le pipeline conserve les relevés horodatés afin de constituer un historique des prix et des ruptures de stock, avec les stations géolocalisées et leurs services.
 
----
+## Fonctionnement actuel
 
-## 🛠️ Stack technique actuelle
+1. **Orchestration** — `dags/collect_dag.py` définit le DAG `collect_carburant_dag`, planifié toutes les 30 minutes, avec deux tentatives de reprise.
+2. **Ingestion** — `src/ingestion/ingestion.py` télécharge le CSV public avec des reprises HTTP et un fichier temporaire renommé atomiquement dans `data/raw/`.
+3. **Transformation** — `src/transformation/station_transform.py` et `utils/transform_utils.py` valident les lignes et construisent stations, prix, services et ruptures; les éléments rejetés sont conservés avec leur motif.
+4. **Chargement** — `src/load/db.py` écrit dans PostgreSQL/PostGIS. Les stations sont mises à jour, les prix déjà présents (clé station/carburant/date de mise à jour) ne sont pas réinsérés, et les ruptures ouvertes sont rapprochées du flux courant.
 
-* **Langage & Traitement :** Python 3.11+, Pandas, Dataclasses (immuables), Decimal (précision monétaire), `zoneinfo` (gestion UTC).
-* **Base de données :** PostgreSQL / PostGIS (Geographic Points WGS84, indexation GiST).
-* **Validation & Tests :** Pytest (démarche TDD, 67 tests unitaires et d'intégration au vert).
-* **Infrastructure :** Docker Compose (Services `db` PostGIS & Apache Airflow LocalExecutor).
+La connexion Airflow à la base métier doit porter l'identifiant `bdd_metiers`. Le code du chargeur l'utilise via `PostgresHook`.
 
----
-
-## 📌 Fonctionnalités implémentées (État d'avancement)
-
-### 1. Ingestion & Collecte (`src/ingestion/flux_instantane.py`)
-* Téléchargement atomique et résilient du flux CSV instantané depuis l'API tabulaire de `data.gouv.fr`.
-* Gestion des relances HTTP (backoff) et vérification d'intégrité du fichier.
-
-### 2. Transformation & Nettoyage (`src/ingestion/utils.py` & `transform.py`)
-* **Parsing géographique :** Normalisation des coordonnées de géolocalisation ($\div 100\,000$) et vérification des bornes métropolitaines.
-* **Dates & Prix :** Alignment strict sur le fuseau UTC avec détection des fuseaux locaux (Europe/Paris), validation par `Decimal`.
-* **Services & Ruptures :** Extraction des services par station (JSON) et conversion des ruptures temporaires avec typage des dates de début.
-* **Gestion fine des rejets :** Isolation des données invalides (motif précis par ligne) sans interrompre le pipeline global (invariant `stations_valides + rejets_stations == total_lignes` respecté).
-
-### 3. Chargement idempotent en base (`src/db.py`)
-* **Transaction unique & atomique :** Tout le chargement s'exécute en un seul bloc (`with conn:`).
-* **Bulk insertion :** Utilisation de `execute_values` de `psycopg2` pour des performances optimales.
-* **Idempotence :** Dédoublonnage strict (`ON CONFLICT (station_id, carburant_id, maj) DO NOTHING`). La ré-exécution immédiate d'un même flux insère exactement 0 nouveau prix.
-* **Gestion dynamique des ruptures :** Ouverture des nouvelles ruptures temporaires (`fin IS NULL`) et fermeture automatique (`UPDATE fin = NOW()`) lorsque le carburant est réapprovisionné sur le terrain.
-
----
-
-## 📁 Architecture du projet
+## Architecture
 
 ```text
-carburants-pipeline/
-├── data/
-│   └── raw/                   # Stockage local des CSV bruts horodatés
-├── sql/
-│   ├── 01_init_postgis.sql    # Extension PostGIS
-│   └── 02_tables.sql          # Modèle de données (station, prix, service, rupture)
+.
+├── dags/collect_dag.py                 # DAG Airflow
 ├── src/
-│   ├── db.py                  # Connexion PostgreSQL et fonctions de chargement
-│   └── ingestion/
-│       ├── flux_instantane.py # Ingestion HTTP
-│       ├── utils.py           # Fonctions de nettoyage et parsing
-│       └── transform.py       # Logique métier et transformation pure
-├── tests/                     # 67 tests unitaires et d'intégration (Pytest)
-├── docker-compose.yml         # Conteneurs PostGIS & Airflow
-├── requirements.txt
-└── README.md
+│   ├── ingestion/ingestion.py          # Téléchargement du CSV
+│   ├── transformation/
+│   │   ├── station.py                  # Objets métier et rejets
+│   │   └── station_transform.py        # Transformation du CSV
+│   └── load/db.py                      # Chargement PostgreSQL
+├── utils/transform_utils.py            # Parsers et validations
+├── sql/
+│   ├── 01_init_postgis.sql             # Extension PostGIS
+│   └── 02_tables.sql                   # Schéma métier et index
+├── tests/                              # Tests unitaires
+├── tests_integration/                  # Scripts d'intégration avec effets de bord
+├── data/raw/                           # CSV téléchargés
+├── docker-compose.yml
+└── requirements.txt
 ```
 
----
+## Démarrage avec Docker Compose
 
-## 🧪 Lancer les tests unitaires
+Prérequis : Docker Compose, accès Internet depuis les conteneurs Airflow et un fichier `.env` à la racine.
 
-Depuis la racine du projet :
+1. Créer le fichier local à partir du modèle et remplacer les valeurs d'exemple par des secrets adaptés :
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Ajouter également à `.env` une valeur `FERNET_KEY` valide pour Airflow. Une clé peut être générée avec Python :
+
+   ```bash
+   python -c 'import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())'
+   ```
+
+   Ne pas publier le fichier `.env` ni les clés générées.
+
+2. Démarrer les services et vérifier leur état :
+
+   ```bash
+   docker compose up -d
+   docker compose ps
+   ```
+
+3. Dans Airflow (`http://localhost:8080`), vérifier ou créer la connexion `bdd_metiers` (**Admin → Connections**) : type `Postgres`, hôte `db`, port `5432`, base/utilisateur/mot de passe correspondant à `POSTGRES_DB`, `POSTGRES_USER` et `POSTGRES_PASSWORD` du `.env`.
+
+4. Le DAG étant créé en pause par défaut, le dé-pauser dans l'interface, puis utiliser **Trigger DAG** pour lancer une collecte. Vérifier l'état `success` dans **Grid** et le journal de la tâche `executer_pipeline_carburants`.
+
+Le port `5433` (par défaut) est le port publié sur l'hôte pour la base métier; entre conteneurs, utiliser le service `db` sur le port `5432`. Si les journaux montrent une erreur de résolution DNS, définir `DOCKER_DNS_SERVER` dans `.env` avec un résolveur joignable depuis Docker, puis recréer les services Airflow :
 
 ```bash
-# Activer l'environnement virtuel
-source .venv/bin/activate
-
-# Lancer la suite complet des tests
-python -m pytest tests/ -v
+docker compose up -d --force-recreate airflow-webserver airflow-scheduler airflow-triggerer
 ```
 
----
+## Tests
 
-## 🚀 Lancer la base de données & tester le chargement
+Depuis la racine du dépôt, lancer les tests unitaires :
 
-1. Démarrer la base de données PostgreSQL / PostGIS avec Docker :
 ```bash
-docker compose up -d db
+python -m pytest -q tests/
 ```
 
-2. Exécuter la collecte et le chargement en base :
+Les scripts de `tests_integration/` ne font pas partie de cette commande : ils lisent le dernier CSV de `data/raw/` et `test_chargement.py` écrit dans la base métier. Ne les lancer que lorsque ces prérequis et les effets sur la base sont voulus.
+
+## Vérifier les données en base
+
+Cette commande ouvre `psql` dans le conteneur de la base métier avec les variables du `.env` :
+
 ```bash
-python -m src.db
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 ```
 
-3. Vérifier les données chargées via `psql` :
+Requêtes de contrôle en lecture seule :
+
 ```sql
-docker compose exec db psql -U carburants_user -d carburants_db
-
--- Nombre de stations valides chargées
 SELECT COUNT(*) FROM station;
-
--- Nombre de prix enregistrés
 SELECT COUNT(*) FROM prix;
-
--- Ruptures temporaires en cours
+SELECT COUNT(*) FROM service;
+SELECT COUNT(*) FROM rupture;
 SELECT COUNT(*) FROM rupture WHERE fin IS NULL;
 ```
 
----
+Il n'existe pas de commande autonome `python -m src.db` : le chargement s'exécute depuis le DAG et dépend de la connexion Airflow `bdd_metiers`.
 
-## 🔄 Prochaines étapes
+## État et prochaines étapes
 
-* [ ] **Orchestration Airflow:** Automatisation du DAG d'exécution toutes les 30 minutes.
-* [ ] **Vues Analytiques SQL:** Calcul des moyennes mobiles 7/30 jours et comparatifs par type de station.
-* [ ] **Dashboard Streamlit :** Visualisation cartographique et graphiques d'évolution des prix.
+- **En place :** ingestion, transformation, chargement PostGIS et orchestration Airflow.
+- **À faire :** vues/requêtes analytiques (par exemple moyennes mobiles sur 7/30 jours) et tableau de bord cartographique/évolutif. Aucun fichier SQL de vues analytiques ni application dans `app/` n'est présent actuellement.
+
+### Validation locale du 24 novembre 2026
+
+- `python -m pytest -q tests/` : **67 tests réussis**.
+- Le run manuel Airflow `collect_carburant_dag` de **21:04 UTC** a terminé en `success` : téléchargement de 18,7 Mo, 9 825 lignes lues, 9 821 stations valides, 32 986 prix et 2 944 ruptures transformés; le journal confirme la fin du chargement PostgreSQL.
+- Lors du contrôle en lecture seule de la base, elle contenait 9 848 stations, 87 678 prix, 27 services et 6 405 ruptures, dont 2 943 ouvertes. Ces nombres décrivent l'état observé à cette date et évolueront avec les collectes.

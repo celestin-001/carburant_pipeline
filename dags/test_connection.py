@@ -1,8 +1,7 @@
 from datetime import datetime
 
-from airflow.sdk import dag, task
+from airflow.decorators import dag, task
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-
 
 @dag(
     dag_id="test_connection",
